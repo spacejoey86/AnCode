@@ -6,6 +6,11 @@ pub struct Token {
     start_index: i32,
     end_index: i32,
 }
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}: \"{}\"", self.token_type, self.value)
+    }
+}
 
 pub struct LexError {
     error_type: LexErrorType,
@@ -18,13 +23,11 @@ pub struct LexError {
 }
 impl std::fmt::Display for LexError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut underline = "".to_string();
-        let mut overline = "".to_string();
+        let underline: String;
         let line_num = if self.start_line == self.end_line {
             underline = "^".repeat((self.start_index - self.end_index + 1) as usize);
             self.start_line.to_string()
         } else {
-            overline = "===".into();
             underline = "===".into();
             self.start_line.to_string() + "-" + &self.end_line.to_string()
         };
@@ -34,7 +37,9 @@ impl std::fmt::Display for LexError {
             self.start_index.to_string() + "-" + &self.end_index.to_string()
         };
 
-        write!(f, "{} on line {}, index {}:\n{}\n{}\n{}", self.error_type.to_string(), line_num, index_num, overline, self.partial_token, underline)
+        write!(f, "Error while lexing file {}", self.file)?;
+        write!(f, "{} on line {}, index {}:", self.error_type.to_string(), line_num, index_num)?;
+        write!(f, "{}\n{}", self.partial_token, underline)
     }
 }
 
@@ -77,7 +82,28 @@ enum TokenType {
     Identifier,
 }
 
-impl TokenType {
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TokenType::BinLiteral => write!(f, "Binary literal"),
+            TokenType::HexLiteral => write!(f, "Hexadecimal literal"),
+            TokenType::DecimalLiteral(_) => write!(f, "Decimal literal"),
+            TokenType::StringLiteral(_) => write!(f, "String literal"),
+            TokenType::Operator(Operator::Plus) => write!(f, "Plus operator"),
+            TokenType::Operator(Operator::Minus) => write!(f, "Minus operator"),
+            TokenType::Operator(Operator::Multiply) => write!(f, "Multiply operator"),
+            TokenType::Operator(Operator::Divide) => write!(f, "Divide operator"),
+            TokenType::LineComment => write!(f, "Line comment"),
+            TokenType::LeftParen => write!(f, "Left paren"),
+            TokenType::RightParen => write!(f, "Right paren"),
+            TokenType::LeftBrace => write!(f, "Left brace"),
+            TokenType::RightBrace => write!(f, "Right brace"),
+            TokenType::Identifier => write!(f, "Identifier"),
+            TokenType::Whitespace => write!(f, "Whitespace"),
+            TokenType::Newline => write!(f, "Newline"),
+            TokenType::EndOfFile => write!(f, "End of file"),
+        }
+    }
 }
 
 enum Operator {
