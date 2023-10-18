@@ -10,6 +10,8 @@ use crate::lexer::{Token, LexError, Lexer};
 #[derive(Parser, Debug)]
 struct Args {
     entry_file: String,
+    #[arg(short, long)]
+    lexer_debug: bool,
 }
 
 fn main() {
@@ -28,6 +30,22 @@ fn main() {
                     println!("Lexing...");
                     let lexer = Lexer::new(args.entry_file);
                     let tokens_result: Result<Vec<Token>,LexError> = lexer.lex(file_string);
+
+                    match tokens_result {
+                        Ok(mut tokens) => {
+                            if args.lexer_debug {
+                                println!("There are {} tokens", tokens.len());
+                                println!("[DEBUG] Tokens:");
+                                for token in tokens {
+                                    println!("{}", token)
+                                }
+                            }
+                        },
+                        Err(lex_error) => {
+
+                        }
+                    }
+
                 },
                 Err(file_error) => {
                     deal_with_file_error(file_error, args.entry_file)
