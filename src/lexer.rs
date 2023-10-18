@@ -9,12 +9,35 @@ pub struct Token {
 
 pub struct LexError {
     error_type: LexErrorType,
+    partial_token: String,
     start_line: i32,
     end_line: i32,
     start_index: i32,
     end_index: i32,
     file: String,
 }
+impl std::fmt::Display for LexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut underline = "".to_string();
+        let mut overline = "".to_string();
+        let line_num = if self.start_line == self.end_line {
+            underline = "^".repeat((self.start_index - self.end_index + 1) as usize);
+            self.start_line.to_string()
+        } else {
+            overline = "===".into();
+            underline = "===".into();
+            self.start_line.to_string() + "-" + &self.end_line.to_string()
+        };
+        let index_num = if self.start_index == self.end_index {
+            self.start_index.to_string()
+        } else {
+            self.start_index.to_string() + "-" + &self.end_index.to_string()
+        };
+
+        write!(f, "{} on line {}, index {}:\n{}\n{}\n{}", self.error_type.to_string(), line_num, index_num, overline, self.partial_token, underline)
+    }
+}
+
 enum LexErrorType {
     WrongQuotes,
     MalformedBinLiteral,
@@ -23,6 +46,19 @@ enum LexErrorType {
     MalformedDecLiteral,
     MultipleDecimalPoints,
     UnexpectedCharacter,
+}
+impl std::fmt::Display for LexErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LexErrorType::WrongQuotes => write!(f, "Wrong quotes"),
+            LexErrorType::MalformedBinLiteral => write!(f, "Malformed binary literal"),
+            LexErrorType::WrongHexCase => write!(f, "Hexadecimals should always use lower case"),
+            LexErrorType::MalformedHexLiteral => write!(f, "Malformed hexadecimal literal"),
+            LexErrorType::MalformedDecLiteral => write!(f, "Malformed decimal literal"),
+            LexErrorType::MultipleDecimalPoints => write!(f, "Multiple decimal points in decimal literal"),
+            LexErrorType::UnexpectedCharacter => write!(f, "Unexpected character in input"),
+        }
+    }
 }
 
 enum TokenType {
@@ -54,7 +90,7 @@ enum Operator {
 pub struct Lexer {
     full_tokens: Vec<Token>,
     partial_token: String,
-    // current_char: Option<char>,
+    current_char: Option<char>,
     proposed_token_type: Option<TokenType>,
 
     start_line: i32,
@@ -70,7 +106,7 @@ impl Lexer {
         return Lexer {
             full_tokens: Vec::new(),
             partial_token: String::new(),
-            // current_char: None,
+            current_char: None,
             proposed_token_type: None,
 
             start_line: 0,
@@ -115,13 +151,16 @@ impl Lexer {
     }
 
     fn construct_error(&self, e_type: LexErrorType) -> LexError {
-        return LexError { error_type: e_type,
+        let mut token = self.partial_token.clone();
+        token.push(self.current_char.unwrap_or_default());
+        return LexError { error_type: e_type, partial_token: token,
             start_line: self.start_line, end_line: self.end_line,
             start_index: self.start_index, end_index: self.end_index,
             file: self.file.clone() }
     }
 
     fn consume_char(&mut self, current_char: char) -> Result<(), LexError>{
+        self.current_char = Some(current_char);
         match &self.proposed_token_type {
             Some(TokenType::BinLiteral) => {
                 if "01".contains(current_char) {
@@ -284,6 +323,26 @@ impl Lexer {
                         return Err(self.construct_error(LexErrorType::UnexpectedCharacter))
                     }
                 }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn single_identifier() {
+        let lexer = Lexer::new("my_file".into());
+        match lexer.lex("MyVariable\n".into()) {
+            Ok(tokens) => {
+                println!("{}", tokens.len());
+                assert!(tokens.len() == 1);
+            },
+            Err(err) => {
+                eprintln!("{}", err.to_string());
+                panic!()
             }
         }
     }
