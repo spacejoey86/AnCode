@@ -12,6 +12,7 @@ impl std::fmt::Display for Token {
     }
 }
 
+#[derive(Debug)]
 pub struct LexError {
     error_type: LexErrorType,
     partial_token: String,
@@ -56,6 +57,7 @@ impl std::fmt::Display for LexError {
     }
 }
 
+#[derive(Debug)]
 enum LexErrorType {
     WrongQuotes,
     MalformedBinLiteral,
@@ -89,6 +91,7 @@ impl std::fmt::Display for LexErrorType {
     }
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
 enum TokenType {
     BinLiteral,
     HexLiteral,
@@ -137,6 +140,7 @@ impl std::fmt::Display for TokenType {
     }
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
 enum Operator {
     Plus,
     Minus,
@@ -478,18 +482,15 @@ impl Lexer {
 mod tests {
     use super::*;
 
+    fn lex_to_tokens(source: &str) -> Vec<TokenType>{
+        let lexer = Lexer::new("my_file".into());
+        let tokens = lexer.lex(source.into()).expect("Unexpected error during test");
+        return tokens.iter().map(|x| x.token_type).collect();
+    }
+
     #[test]
     fn single_identifier() {
-        let lexer = Lexer::new("my_file".into());
-        match lexer.lex("MyVariable\n".into()) {
-            Ok(tokens) => {
-                println!("{}", tokens.len());
-                assert!(tokens.len() == 1);
-            },
-            Err(err) => {
-                eprintln!("{}", err.to_string());
-                panic!()
-            }
-        }
+        assert_eq!(lex_to_tokens("MyVariable\n"),
+            vec![TokenType::Identifier, TokenType::Newline, TokenType::EndOfFile]);
     }
 }
