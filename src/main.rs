@@ -16,23 +16,20 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    println!("Compiling {}", args.entry_file);
 
     let entry_file_result = File::open(&args.entry_file);
     match entry_file_result {
         Ok(mut main_file) => {
-            println!("Found file {}", args.entry_file);
             //do compiler stuff here
             let mut file_string = String::new();
             let file_result = main_file.read_to_string(&mut file_string);
             match file_result {
                 Ok(_) => {
-                    println!("Lexing...");
                     let lexer = Lexer::new(args.entry_file);
                     let tokens_result: Result<Vec<Token>,LexError> = lexer.lex(file_string);
 
                     match tokens_result {
-                        Ok(mut tokens) => {
+                        Ok(tokens) => {
                             if args.lexer_debug {
                                 println!("There are {} tokens", tokens.len());
                                 println!("[DEBUG] Tokens:");
@@ -42,7 +39,7 @@ fn main() {
                             }
                         },
                         Err(lex_error) => {
-
+                            print!("{}", lex_error.to_string())
                         }
                     }
 
