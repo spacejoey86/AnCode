@@ -20,15 +20,29 @@ pub struct LexError {
     start_index: i32,
     end_index: i32,
     file: String,
+    file_contents: String
 }
 impl std::fmt::Display for LexError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Error while lexing file {}\n", self.file)?;
+
         let underline: String;
+        let line: String;
         let line_num = if self.start_line == self.end_line {
-            underline = "^".repeat((self.start_index - self.end_index + 1) as usize);
+            //single line error:
+            line = self.file_contents.lines().nth(self.start_line as usize - 1).unwrap().to_string();
+            underline = " ".repeat(self.start_index as usize) +
+                &"^".repeat((self.end_index - self.start_index) as usize) +
+                &"\n";
             self.start_line.to_string()
         } else {
-            underline = "===".into();
+            //multi-line error
+            line = self.file_contents.lines()
+                .skip(self.start_line as usize - 1)
+                .take((self.end_line - self.start_line) as usize)
+                .map(|x| x.to_owned().chars().collect::<Vec<char>>())
+                .flatten().collect();
+            underline = "".into();
             self.start_line.to_string() + "-" + &self.end_line.to_string()
         };
         let index_num = if self.start_index == self.end_index {
@@ -37,9 +51,8 @@ impl std::fmt::Display for LexError {
             self.start_index.to_string() + "-" + &self.end_index.to_string()
         };
 
-        write!(f, "Error while lexing file {}", self.file)?;
-        write!(f, "{} on line {}, index {}:", self.error_type.to_string(), line_num, index_num)?;
-        write!(f, "{}\n{}", self.partial_token, underline)
+        write!(f, "{} on line {}, index {}:\n", self.error_type.to_string(), line_num, index_num)?;
+        write!(f, "{}\n{}", line, underline)
     }
 }
 
@@ -144,6 +157,7 @@ pub struct Lexer {
     end_index: i32,
 
     file: String,
+    file_contents: Option<String>
 }
 
 impl Lexer {
@@ -154,16 +168,18 @@ impl Lexer {
             current_char: None,
             proposed_token_type: None,
 
-            start_line: 0,
-            end_line: 0,
+            start_line: 1,
+            end_line: 1,
             start_index: 0,
             end_index: 0,
 
             file: current_file,
+            file_contents: None,
         }
     }
 
     pub fn lex(mut self, source: String) -> Result<Vec<Token>,LexError> {
+        self.file_contents = Some(source.clone());
         for current_char in source.chars() {
             match self.consume_char(current_char) {
                 Ok(()) => {},
@@ -210,12 +226,16 @@ impl Lexer {
     }
 
     fn construct_error(&self, e_type: LexErrorType) -> LexError {
-        let mut token = self.partial_token.clone();
-        token.push(self.current_char.unwrap_or_default());
+        let token = self.partial_token.clone();
         return LexError { error_type: e_type, partial_token: token,
             start_line: self.start_line, end_line: self.end_line,
             start_index: self.start_index, end_index: self.end_index,
-            file: self.file.clone() }
+            file: self.file.clone(), file_contents: self.file_contents.clone().unwrap()}
+    }
+
+    fn construct_error_w_char(&mut self, e_type: LexErrorType) -> LexError {
+        self.partial_token.push(self.current_char.unwrap_or_default());
+        return self.construct_error(e_type);
     }
 
     fn consume_char(&mut self, current_char: char) -> Result<(), LexError>{
@@ -228,7 +248,7 @@ impl Lexer {
                 } else if " \n".contains(current_char) { //TODO: What if the literal is followed by an operator
                     match self.partial_token.chars().last().unwrap() {
                         'b' => {
-                            return Err(self.construct_error(LexErrorType::EmptyBinLiteral))
+                            return Err(self.construct_error_w_char(LexErrorType::EmptyBinLiteral))
                         },
                         _ => {
                             self.push_token();
@@ -236,7 +256,7 @@ impl Lexer {
                         }
                     }
                 } else {
-                    return Err(self.construct_error(LexErrorType::MalformedBinLiteral))
+                    return Err(self.construct_error_w_char(LexErrorType::MalformedBinLiteral))
                 }
             },
             Some(TokenType::HexLiteral) => {
@@ -244,12 +264,12 @@ impl Lexer {
                     self.push_char(current_char);
                     Ok(())
                 } else if "ABCDEF".contains(current_char) {
-                    return Err(self.construct_error(LexErrorType::WrongHexCase))
+                    return Err(self.construct_error_w_char(LexErrorType::WrongHexCase))
                 } else if " \n".contains(current_char) {
                     self.push_token();
                     return self.consume_char(current_char);
                 } else {
-                    return Err(self.construct_error(LexErrorType::MalformedHexLiteral))
+                    return Err(self.construct_error_w_char(LexErrorType::MalformedHexLiteral))
                 }
             },
             Some(TokenType::DecimalLiteral(has_decimal_point)) => {
@@ -270,7 +290,7 @@ impl Lexer {
                     Ok(())
                 } else if current_char == '.' {
                     if *has_decimal_point {
-                            return Err(self.construct_error(LexErrorType::MultipleDecimalPoints))
+                            return Err(self.construct_error_w_char(LexErrorType::MultipleDecimalPoints))
                     } else {
                         self.proposed_token_type = Some(TokenType::DecimalLiteral(true));
                         self.push_char(current_char);
@@ -279,7 +299,7 @@ impl Lexer {
                 } else if " \n".contains(current_char) {
                     match self.partial_token.chars().last().unwrap() {
                         '.' => {
-                            return Err(self.construct_error(LexErrorType::TrailingDPoint))
+                            return Err(self.construct_error_w_char(LexErrorType::TrailingDPoint))
                         },
                         _ => {
                             self.push_token();
@@ -287,7 +307,7 @@ impl Lexer {
                         }
                     }
                 } else {
-                    return Err(self.construct_error(LexErrorType::MalformedDecLiteral))
+                    return Err(self.construct_error_w_char(LexErrorType::MalformedDecLiteral))
                 }
             },
             Some(TokenType::StringLiteral(escaped)) => {
@@ -373,7 +393,7 @@ impl Lexer {
                         return Ok(())
                     },
                     '\'' => {
-                        return Err(self.construct_error(LexErrorType::WrongQuotes))
+                        return Err(self.construct_error_w_char(LexErrorType::WrongQuotes))
                     },
                     '+' => {
                         self.push_char(current_char);
@@ -446,7 +466,7 @@ impl Lexer {
                         return Ok(());
                     }
                     _ => {
-                        return Err(self.construct_error(LexErrorType::UnexpectedCharacter))
+                        return Err(self.construct_error_w_char(LexErrorType::UnexpectedCharacter))
                     }
                 }
             }
