@@ -53,6 +53,9 @@ enum LexErrorType {
     UnexpectedCharacter,
     TrailingDPoint,
     EmptyBinLiteral,
+    EmptyHexLiteral,
+    UnexpectedEOFString,
+    MissingTrailingNewLine,
 }
 impl std::fmt::Display for LexErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -66,6 +69,9 @@ impl std::fmt::Display for LexErrorType {
             LexErrorType::UnexpectedCharacter => write!(f, "Unexpected character in input"),
             LexErrorType::TrailingDPoint => write!(f, "Decimal literal cannot end in decimal point"),
             LexErrorType::EmptyBinLiteral => write!(f, "Binary literal must be at least one bit long"),
+            LexErrorType::EmptyHexLiteral => write!(f, "Hexadecimal literal must be at least one digit long"),
+            LexErrorType::UnexpectedEOFString => write!(f, "Unexpected EOF while lexing string literal"),
+            LexErrorType::MissingTrailingNewLine => write!(f, "File should end with a trailing newline"),
         }
     }
 }
@@ -161,6 +167,20 @@ impl Lexer {
                 }
             }
         }
+
+        //partial token followed by EOF
+        match self.proposed_token_type {
+            Some(TokenType::StringLiteral(_)) => {
+                return Err(self.construct_error(LexErrorType::UnexpectedEOFString))
+            },
+            None => {},
+            Some(_) => {
+                return Err(self.construct_error(LexErrorType::MissingTrailingNewLine))
+            }
+        }
+        self.proposed_token_type = Some(TokenType::EndOfFile);
+        self.push_token();
+
         return Ok(self.full_tokens)
     }
 
@@ -206,8 +226,8 @@ impl Lexer {
                             return Err(self.construct_error(LexErrorType::EmptyBinLiteral))
                         },
                         _ => {
-                    self.push_token();
-                    return self.consume_char(current_char);
+                            self.push_token();
+                            return self.consume_char(current_char);
                         }
                     }
                 } else {
@@ -257,8 +277,8 @@ impl Lexer {
                             return Err(self.construct_error(LexErrorType::TrailingDPoint))
                         },
                         _ => {
-                    self.push_token();
-                    return self.consume_char(current_char);
+                            self.push_token();
+                            return self.consume_char(current_char);
                         }
                     }
                 } else {
