@@ -89,6 +89,8 @@ enum TokenType {
     LeftBrace,
     RightBrace,
 
+    Equals,
+
     Identifier,
 
     Whitespace,
@@ -107,6 +109,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Operator(Operator::Minus) => write!(f, "Minus operator"),
             TokenType::Operator(Operator::Multiply) => write!(f, "Multiply operator"),
             TokenType::Operator(Operator::Divide) => write!(f, "Divide operator"),
+            TokenType::Operator(Operator::Equals) => write!(f, "Equality operator"),
             TokenType::LineComment => write!(f, "Line comment"),
             TokenType::LeftParen => write!(f, "Left paren"),
             TokenType::RightParen => write!(f, "Right paren"),
@@ -116,6 +119,7 @@ impl std::fmt::Display for TokenType {
             TokenType::Whitespace => write!(f, "Whitespace"),
             TokenType::Newline => write!(f, "Newline"),
             TokenType::EndOfFile => write!(f, "End of file"),
+            TokenType::Equals => write!(f, "Equals"),
         }
     }
 }
@@ -125,6 +129,7 @@ enum Operator {
     Minus,
     Multiply,
     Divide,
+    Equals,
 }
 
 pub struct Lexer {
@@ -339,6 +344,17 @@ impl Lexer {
                     return Ok(());
                 }
             },
+            Some(TokenType::Equals) => {
+                if current_char == '=' {
+                    self.proposed_token_type = Some(TokenType::Operator(Operator::Equals));
+                    self.push_char(current_char);
+                    self.push_token();
+                    Ok(())
+                } else {
+                    self.push_token();
+                    return self.consume_char(current_char);
+                }
+            }
             Some(TokenType::LeftBrace) | Some(TokenType::RightBrace) |
             Some(TokenType::LeftParen) | Some(TokenType::RightParen) |
             Some(TokenType::Newline) | Some(TokenType::EndOfFile) => {
@@ -423,6 +439,11 @@ impl Lexer {
                         self.proposed_token_type = Some(TokenType::Newline);
                         self.push_token();
                         return Ok(())
+                    },
+                    '=' => {
+                        self.push_char(current_char);
+                        self.proposed_token_type = Some(TokenType::Equals);
+                        return Ok(());
                     }
                     _ => {
                         return Err(self.construct_error(LexErrorType::UnexpectedCharacter))
