@@ -1,10 +1,10 @@
 pub struct Token {
     token_type: TokenType,
     value: String,
-    start_line: i32,
-    end_line: i32,
-    start_index: i32,
-    end_index: i32,
+    start_line: usize,
+    end_line: usize,
+    start_index: usize,
+    end_index: usize,
 }
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -16,10 +16,10 @@ impl std::fmt::Display for Token {
 pub struct LexError {
     error_type: LexErrorType,
     partial_token: String,
-    start_line: i32,
-    end_line: i32,
-    start_index: i32,
-    end_index: i32,
+    start_line: usize,
+    end_line: usize,
+    start_index: usize,
+    end_index: usize,
     file: String,
     file_contents: String
 }
@@ -31,16 +31,16 @@ impl std::fmt::Display for LexError {
         let line: String;
         let line_num = if self.start_line == self.end_line {
             //single line error:
-            line = self.file_contents.lines().nth(self.start_line as usize - 1).unwrap().to_string();
+            line = self.file_contents.lines().nth(self.start_line - 1).unwrap().to_string();
             underline = " ".repeat(self.start_index as usize) +
-                &"^".repeat((self.end_index - self.start_index) as usize) +
+                &"^".repeat(self.end_index - self.start_index) +
                 &"\n";
             self.start_line.to_string()
         } else {
             //multi-line error
             line = self.file_contents.lines()
-                .skip(self.start_line as usize - 1)
-                .take((self.end_line - self.start_line) as usize)
+                .skip(self.start_line - 1)
+                .take(self.end_line - self.start_line)
                 .map(|x| x.to_owned().chars().collect::<Vec<char>>())
                 .flatten().collect();
             underline = "".into();
@@ -155,10 +155,10 @@ pub struct Lexer {
     current_char: Option<char>,
     proposed_token_type: Option<TokenType>,
 
-    start_line: i32,
-    end_line: i32,
-    start_index: i32,
-    end_index: i32,
+    start_line: usize,
+    end_line: usize,
+    start_index: usize,
+    end_index: usize,
 
     file: String,
     file_contents: Option<String>
