@@ -51,6 +51,8 @@ enum LexErrorType {
     MalformedDecLiteral,
     MultipleDecimalPoints,
     UnexpectedCharacter,
+    TrailingDPoint,
+    EmptyBinLiteral,
 }
 impl std::fmt::Display for LexErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -62,6 +64,8 @@ impl std::fmt::Display for LexErrorType {
             LexErrorType::MalformedDecLiteral => write!(f, "Malformed decimal literal"),
             LexErrorType::MultipleDecimalPoints => write!(f, "Multiple decimal points in decimal literal"),
             LexErrorType::UnexpectedCharacter => write!(f, "Unexpected character in input"),
+            LexErrorType::TrailingDPoint => write!(f, "Decimal literal cannot end in decimal point"),
+            LexErrorType::EmptyBinLiteral => write!(f, "Binary literal must be at least one bit long"),
         }
     }
 }
@@ -80,6 +84,10 @@ enum TokenType {
     RightBrace,
 
     Identifier,
+
+    Whitespace,
+    Newline,
+    EndOfFile,
 }
 
 impl std::fmt::Display for TokenType {
@@ -109,7 +117,7 @@ impl std::fmt::Display for TokenType {
 enum Operator {
     Plus,
     Minus,
-    Times,
+    Multiply,
     Divide,
 }
 
@@ -193,8 +201,15 @@ impl Lexer {
                     self.push_char(current_char);
                     Ok(())
                 } else if " \n".contains(current_char) { //TODO: What if the literal is followed by an operator
+                    match self.partial_token.chars().last().unwrap() {
+                        'b' => {
+                            return Err(self.construct_error(LexErrorType::EmptyBinLiteral))
+                        },
+                        _ => {
                     self.push_token();
                     return self.consume_char(current_char);
+                        }
+                    }
                 } else {
                     return Err(self.construct_error(LexErrorType::MalformedBinLiteral))
                 }
@@ -237,8 +252,15 @@ impl Lexer {
                         Ok(())
                     }
                 } else if " \n".contains(current_char) {
+                    match self.partial_token.chars().last().unwrap() {
+                        '.' => {
+                            return Err(self.construct_error(LexErrorType::TrailingDPoint))
+                        },
+                        _ => {
                     self.push_token();
                     return self.consume_char(current_char);
+                        }
+                    }
                 } else {
                     return Err(self.construct_error(LexErrorType::MalformedDecLiteral))
                 }
@@ -278,7 +300,16 @@ impl Lexer {
                         panic!("unterminated operator token")
                     }
                 }
-            }
+            },
+            Some(TokenType::Whitespace) => {
+                if current_char == ' ' {
+                    self.push_char(current_char);
+                    Ok(())
+                } else {
+                    self.push_token();
+                    return self.consume_char(current_char);
+                }
+            },
             Some(TokenType::Identifier) => {
                 if " \n".contains(current_char) {
                     self.push_token();
@@ -289,18 +320,19 @@ impl Lexer {
                 }
             },
             Some(TokenType::LeftBrace) | Some(TokenType::RightBrace) |
-            Some(TokenType::LeftParen) | Some(TokenType::RightParen) => {
+            Some(TokenType::LeftParen) | Some(TokenType::RightParen) |
+            Some(TokenType::Newline) | Some(TokenType::EndOfFile) => {
                 panic!("Unexpected partial bracket token")
             }
             None => {
                 match current_char {
                     '0'..='9' => {
                         self.push_char(current_char);
-                        self.push_token();
                         self.proposed_token_type = Some(TokenType::DecimalLiteral(false));
                         return Ok(())
                     },
                     '"' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::StringLiteral(false));
                         return Ok(())
                     },
@@ -308,43 +340,70 @@ impl Lexer {
                         return Err(self.construct_error(LexErrorType::WrongQuotes))
                     },
                     '+' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::Operator(Operator::Plus));
+                        self.push_token();
                         return Ok(())
                     },
                     '-' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::Operator(Operator::Minus));
+                        self.push_token();
                         return Ok(())
                     },
                     '*' => {
-                        self.proposed_token_type = Some(TokenType::Operator(Operator::Times));
+                        self.push_char(current_char);
+                        self.proposed_token_type = Some(TokenType::Operator(Operator::Multiply));
+                        self.push_token();
                         return Ok(())
                     },
                     '/' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::Operator(Operator::Divide));
                         return Ok(())
                     },
 
                     '(' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::LeftParen);
+                        self.push_token();
                         return Ok(())
                     },
                     ')' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::RightParen);
+                        self.push_token();
                         return Ok(())
                     },
                     '{' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::LeftBrace);
+                        self.push_token();
                         return Ok(())
                     },
                     '}' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::RightBrace);
+                        self.push_token();
                         return Ok(())
                     },
 
                     'a'..='z' | 'A'..='Z' => {
+                        self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::Identifier);
                         return Ok(())
                     },
+                    ' ' => {
+                        self.push_char(current_char);
+                        self.proposed_token_type = Some(TokenType::Whitespace);
+                        return Ok(())
+                    },
+                    '\n' => {
+                        self.push_char(current_char);
+                        self.proposed_token_type = Some(TokenType::Newline);
+                        self.push_token();
+                        return Ok(())
+                    }
                     _ => {
                         return Err(self.construct_error(LexErrorType::UnexpectedCharacter))
                     }
