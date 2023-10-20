@@ -482,15 +482,59 @@ impl Lexer {
 mod tests {
     use super::*;
 
-    fn lex_to_tokens(source: &str) -> Vec<TokenType>{
+    fn lex_to_tokens(source: &str) -> Vec<TokenType> {
         let lexer = Lexer::new("my_file".into());
         let tokens = lexer.lex(source.into()).expect("Unexpected error during test");
         return tokens.iter().map(|x| x.token_type).collect();
+    }
+
+    fn lex_to_err(source: &str) -> LexErrorType {
+        let lexer = Lexer::new("my_file".into());
+        match lexer.lex(source.into()) {
+            Ok(_) => {
+                panic!("Error not thrown when expected");
+            },
+            Err(e) => {
+                return e.error_type;
+            }
+        }
+    }
+
+    fn lex(source: &str) -> Result<Vec<Token>, LexError>{
+        let lexer = Lexer::new("my_file".into());
+        return lexer.lex(source.into())
     }
 
     #[test]
     fn single_identifier() {
         assert_eq!(lex_to_tokens("MyVariable\n"),
             vec![TokenType::Identifier, TokenType::Newline, TokenType::EndOfFile]);
+    }
+
+
+    // Test the various errors
+    #[test]
+    fn wrong_quotes() {
+        assert_eq!(lex_to_err("'Hello world'"), LexErrorType::WrongQuotes)
+    }
+
+    #[test]
+    fn wrong_quote() {
+        assert_eq!(lex_to_err("'Hello wo"), LexErrorType::WrongQuotes)
+    }
+
+    #[test]
+    fn wrong_quote_inside() {
+        match lex("\"don't want an error here\"") {
+            Ok(_) => {},
+            Err(e) => {
+                panic!("Incorretly errors on single quote within string literal")
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_binary() {
+        assert_eq!(lex_to_err("0b0110534"), LexErrorType::MalformedBinLiteral)
     }
 }
