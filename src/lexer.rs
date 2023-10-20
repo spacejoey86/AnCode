@@ -166,6 +166,14 @@ pub struct Lexer {
     file_contents: Option<String>
 }
 
+fn is_literal_terminator(current_char: char) -> bool {
+    if "+-*/!\"%^&(){}[].,|:; \n".contains(current_char) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 impl Lexer {
     pub fn new(current_file: String) -> Lexer{
         return Lexer {
@@ -251,7 +259,7 @@ impl Lexer {
                 if "01".contains(current_char) {
                     self.push_char(current_char);
                     Ok(())
-                } else if " \n".contains(current_char) { //TODO: What if the literal is followed by an operator
+                } else if is_literal_terminator(current_char) { //TODO: What if the literal is followed by an operator
                     match self.partial_token.chars().last().unwrap() {
                         'b' => {
                             return Err(self.construct_error_w_char(LexErrorType::EmptyBinLiteral))
@@ -271,7 +279,7 @@ impl Lexer {
                     Ok(())
                 } else if "ABCDEF".contains(current_char) {
                     return Err(self.construct_error_w_char(LexErrorType::WrongHexCase))
-                } else if " \n".contains(current_char) {
+                } else if is_literal_terminator(current_char) {
                     self.push_token();
                     return self.consume_char(current_char);
                 } else {
@@ -302,7 +310,7 @@ impl Lexer {
                         self.push_char(current_char);
                         Ok(())
                     }
-                } else if " \n".contains(current_char) {
+                } else if is_literal_terminator(current_char) {
                     match self.partial_token.chars().last().unwrap() {
                         '.' => {
                             return Err(self.construct_error_w_char(LexErrorType::TrailingDPoint))
@@ -362,12 +370,13 @@ impl Lexer {
                 }
             },
             Some(TokenType::Identifier) => {
-                if " \n".contains(current_char) {
-                    self.push_token();
-                    return self.consume_char(current_char);
-                } else {
+                if current_char.is_alphabetic() {
                     self.push_char(current_char);
                     return Ok(());
+                } else {
+                    self.push_token();
+                    return self.consume_char(current_char);
+
                 }
             },
             Some(TokenType::Equals) => {
@@ -384,7 +393,7 @@ impl Lexer {
             Some(TokenType::LeftBrace) | Some(TokenType::RightBrace) |
             Some(TokenType::LeftParen) | Some(TokenType::RightParen) |
             Some(TokenType::Newline) | Some(TokenType::EndOfFile) => {
-                panic!("Unexpected partial bracket token")
+                panic!("Unexpected partial token")
             }
             None => {
                 match current_char {
