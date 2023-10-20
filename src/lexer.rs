@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Token {
     token_type: TokenType,
     value: String,
@@ -27,6 +28,12 @@ impl std::fmt::Display for LexError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Error while lexing file {}\n", self.file)?;
 
+        let index_num = if self.start_index == self.end_index {
+            self.start_index.to_string()
+        } else {
+            self.start_index.to_string() + "-" + &self.end_index.to_string()
+        };
+
         let underline: String;
         let line: String;
         let line_num = if self.start_line == self.end_line {
@@ -35,29 +42,24 @@ impl std::fmt::Display for LexError {
             underline = " ".repeat(self.start_index as usize) +
                 &"^".repeat(self.end_index - self.start_index) +
                 &"\n";
-            self.start_line.to_string()
+            "line ".to_string() + &self.start_line.to_string() + ", index " + &index_num
         } else {
             //multi-line error
             line = self.file_contents.lines()
                 .skip(self.start_line - 1)
-                .take(self.end_line - self.start_line)
-                .map(|x| x.to_owned().chars().collect::<Vec<char>>())
-                .flatten().collect();
+                .take(self.end_line - self.start_line + 1)
+                .map(|x| x.to_owned()).collect::<Vec<String>>()
+                .join("\n");
             underline = "".into();
-            self.start_line.to_string() + "-" + &self.end_line.to_string()
-        };
-        let index_num = if self.start_index == self.end_index {
-            self.start_index.to_string()
-        } else {
-            self.start_index.to_string() + "-" + &self.end_index.to_string()
+            "lines ".to_string() + &self.start_line.to_string() + "-" + &self.end_line.to_string()
         };
 
-        write!(f, "{} on line {}, index {}:\n", self.error_type.to_string(), line_num, index_num)?;
+        write!(f, "{} on {}:\n", self.error_type.to_string(), line_num)?;
         write!(f, "{}\n{}", line, underline)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum LexErrorType {
     WrongQuotes,
     MalformedBinLiteral,
