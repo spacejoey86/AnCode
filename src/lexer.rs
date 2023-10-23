@@ -543,6 +543,7 @@ mod tests {
         match lex("\"don't want an error here\"") {
             Ok(_) => {},
             Err(e) => {
+                println!("{}", e);
                 panic!("Incorrectly errors on single quote within string literal")
             }
         }
