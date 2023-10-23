@@ -280,8 +280,12 @@ impl Lexer {
                 } else if "ABCDEF".contains(current_char) {
                     return Err(self.construct_error_w_char(LexErrorType::WrongHexCase))
                 } else if is_literal_terminator(current_char) {
-                    self.push_token();
-                    return self.consume_char(current_char);
+                    if self.partial_token.chars().last().unwrap() == 'x' {
+                        return Err(self.construct_error(LexErrorType::EmptyHexLiteral));
+                    } else {
+                        self.push_token();
+                        return self.consume_char(current_char);
+                    }
                 } else {
                     return Err(self.construct_error_w_char(LexErrorType::MalformedHexLiteral))
                 }
@@ -539,7 +543,7 @@ mod tests {
         match lex("\"don't want an error here\"") {
             Ok(_) => {},
             Err(e) => {
-                panic!("Incorretly errors on single quote within string literal")
+                panic!("Incorrectly errors on single quote within string literal")
             }
         }
     }
@@ -547,5 +551,82 @@ mod tests {
     #[test]
     fn malformed_binary() {
         assert_eq!(lex_to_err("0b0110534"), LexErrorType::MalformedBinLiteral)
+    }
+
+    #[test]
+    fn hex_right() {
+        match lex("0xdeadbeef\n") {
+            Ok(_) => {},
+            Err(e) => {
+                println!("{}", e);
+                panic!("Incorrectly errors on correct hex literal")
+            }
+        }
+    }
+
+    #[test]
+    fn hex_wrong() {
+        assert_eq!(lex_to_err("0x4D\n"), LexErrorType::WrongHexCase);
+    }
+
+    #[test]
+    fn hex_mixed() {
+        assert_eq!(lex_to_err("0x4Dd\n"), LexErrorType::WrongHexCase);
+    }
+
+    #[test]
+    fn bad_hex() {
+        assert_eq!(lex_to_err("0x4dk\n"), LexErrorType::MalformedHexLiteral);
+    }
+
+    #[test]
+    fn dec_wrong() {
+        assert_eq!(lex_to_err("0.f\n"), LexErrorType::MalformedDecLiteral);
+    }
+
+    #[test]
+    fn dec_trailing_dpoint() {
+        assert_eq!(lex_to_err("56.\n"), LexErrorType::TrailingDPoint);
+    }
+
+    #[test]
+    fn dec_multiple_dpoint() {
+        assert_eq!(lex_to_err("7.3.7"), LexErrorType::MultipleDecimalPoints);
+    }
+
+    #[test]
+    fn malformed_decimal() {
+        assert_eq!(lex_to_err("56j54"), LexErrorType::MalformedDecLiteral);
+    }
+
+    #[test]
+    fn decimal_and_operators() {
+        match lex("56+23\n") {
+            Ok(_) => {},
+            Err(e) => {
+                println!("{}", e);
+                panic!("Decimal not terminated at operator")
+            }
+        }
+    }
+
+    #[test]
+    fn bin_empty() {
+        assert_eq!(lex_to_err("0b\n"), LexErrorType::EmptyBinLiteral);
+    }
+
+    #[test]
+    fn hex_empty() {
+        assert_eq!(lex_to_err("0x\n"), LexErrorType::EmptyHexLiteral);
+    }
+
+    #[test]
+    fn unexpected_end_of_file() {
+        assert_eq!(lex_to_err("\"Hello wo"), LexErrorType::UnexpectedEOFString);
+    }
+
+    #[test]
+    fn trailing_newline() {
+        assert_eq!(lex_to_err("let x = 4"), LexErrorType::MissingTrailingNewLine);
     }
 }
