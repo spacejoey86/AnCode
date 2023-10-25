@@ -250,6 +250,7 @@ impl Lexer {
     }
 
     fn construct_error_w_char(&mut self, e_type: LexErrorType) -> LexError {
+        self.end_index += 1;
         self.partial_token.push(self.current_char.unwrap_or_default());
         return self.construct_error(e_type);
     }
