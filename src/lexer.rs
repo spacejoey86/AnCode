@@ -73,6 +73,7 @@ enum LexErrorType {
     EmptyHexLiteral,
     UnexpectedEOFString,
     MissingTrailingNewLine,
+    TrailingWhitespace,
 }
 impl std::fmt::Display for LexErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -89,6 +90,7 @@ impl std::fmt::Display for LexErrorType {
             LexErrorType::EmptyHexLiteral => write!(f, "Hexadecimal literal must be at least one digit long"),
             LexErrorType::UnexpectedEOFString => write!(f, "Unexpected EOF while lexing string literal"),
             LexErrorType::MissingTrailingNewLine => write!(f, "File should end with a trailing newline"),
+            LexErrorType::TrailingWhitespace => write!(f, "Trailing whitespace"),
         }
     }
 }
@@ -340,8 +342,15 @@ impl Lexer {
             },
             Some(TokenType::LineComment) => {
                 if current_char == '\n' {
-                    self.push_token();
-                    return self.consume_char(current_char);
+                    match self.partial_token.chars().last().unwrap() {
+                        ' ' => {
+                            return Err(self.construct_error(LexErrorType::TrailingWhitespace));
+                        },
+                        _ => {
+                            self.push_token();
+                            return self.consume_char(current_char);
+                        }
+                    }
                 } else {
                     self.push_char(current_char);
                     return Ok(())
@@ -474,6 +483,17 @@ impl Lexer {
                         return Ok(())
                     },
                     '\n' => {
+                        match self.full_tokens.last() {
+                            Some(token) => {
+                                match token.token_type {
+                                    TokenType::Whitespace => {
+                                        return Err(self.construct_error_w_char(LexErrorType::TrailingWhitespace));
+                                    },
+                                    _ => {}
+                                }
+                            },
+                            None => {}
+                        }
                         self.push_char(current_char);
                         self.proposed_token_type = Some(TokenType::Newline);
                         self.push_token();
@@ -629,5 +649,20 @@ mod tests {
     #[test]
     fn trailing_newline() {
         assert_eq!(lex_to_err("let x = 4"), LexErrorType::MissingTrailingNewLine);
+    }
+
+    #[test]
+    fn trailing_space() {
+        assert_eq!(lex_to_err("test \nthis is code\n"), LexErrorType::TrailingWhitespace);
+    }
+
+    #[test]
+    fn trailing_whitespace_comment() {
+        assert_eq!(lex_to_err("//This is a comment with trailing whitespace \nlet x = 5\n"), LexErrorType::TrailingWhitespace);
+    }
+
+    #[test]
+    fn trailing_whitespace_string() {
+        lex_to_tokens("let x = \"This is a string literal \nwith intentional trailing \nwhitespace\"\n");
     }
 }
