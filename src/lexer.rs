@@ -80,16 +80,16 @@ impl std::fmt::Display for LexErrorType {
         match self {
             LexErrorType::WrongQuotes => write!(f, "Wrong quotes"),
             LexErrorType::MalformedBinLiteral => write!(f, "Malformed binary literal"),
-            LexErrorType::WrongHexCase => write!(f, "Hexadecimals should always use lower case"),
+            LexErrorType::WrongHexCase => write!(f, "Hexadecimals with uppercase letters"),
             LexErrorType::MalformedHexLiteral => write!(f, "Malformed hexadecimal literal"),
             LexErrorType::MalformedDecLiteral => write!(f, "Malformed decimal literal"),
             LexErrorType::MultipleDecimalPoints => write!(f, "Multiple decimal points in decimal literal"),
-            LexErrorType::UnexpectedCharacter => write!(f, "Unexpected character in input"),
-            LexErrorType::TrailingDPoint => write!(f, "Decimal literal cannot end in decimal point"),
-            LexErrorType::EmptyBinLiteral => write!(f, "Binary literal must be at least one bit long"),
-            LexErrorType::EmptyHexLiteral => write!(f, "Hexadecimal literal must be at least one digit long"),
-            LexErrorType::UnexpectedEOFString => write!(f, "Unexpected EOF while lexing string literal"),
-            LexErrorType::MissingTrailingNewLine => write!(f, "File should end with a trailing newline"),
+            LexErrorType::UnexpectedCharacter => write!(f, "Unexpected character"),
+            LexErrorType::TrailingDPoint => write!(f, "Decimal literal ending in decimal point"),
+            LexErrorType::EmptyBinLiteral => write!(f, "Binary literal with no bits"),
+            LexErrorType::EmptyHexLiteral => write!(f, "Hexadecimal literal with no digits"),
+            LexErrorType::UnexpectedEOFString => write!(f, "Found EOF while looking for closing quotation marks"),
+            LexErrorType::MissingTrailingNewLine => write!(f, "File doesn't end with a trailing newline"),
             LexErrorType::TrailingWhitespace => write!(f, "Trailing whitespace"),
         }
     }
